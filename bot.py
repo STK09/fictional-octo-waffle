@@ -4,10 +4,8 @@ import random
 from datetime import datetime, timedelta
 from pymongo import MongoClient
 from telegram import Update
-from telegram.constants import ParseMode  # Corrected import
-from telegram.ext import Updater, CommandHandler, MessageHandler, CallbackContext
-from telegram.ext.filters import TextFilter  # Corrected Filters import
-
+from telegram.constants import ParseMode
+from telegram.ext import Updater, CommandHandler, MessageHandler, CallbackContext, filters
 
 # Load environment variables
 BOT_TOKEN = os.getenv("BOT_TOKEN")
@@ -186,6 +184,7 @@ def main():
     updater = Updater(BOT_TOKEN)
     dispatcher = updater.dispatcher
 
+    # Command handlers
     dispatcher.add_handler(CommandHandler("login", login))
     dispatcher.add_handler(CommandHandler("auth", auth))
     dispatcher.add_handler(CommandHandler("unauth", unauth))
@@ -193,7 +192,9 @@ def main():
     dispatcher.add_handler(CommandHandler("users", users))
     dispatcher.add_handler(CommandHandler("msg", msg))
     dispatcher.add_handler(CommandHandler("req", req))
-    dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, unauthorized_message))
+
+    # Message handler for unauthorized users
+    dispatcher.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, unauthorized_message))
 
     updater.start_polling()
     updater.idle()
