@@ -5,7 +5,8 @@ from datetime import datetime, timedelta
 from pymongo import MongoClient
 from telegram import Update
 from telegram.constants import ParseMode  # Corrected import
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
+from telegram.ext import Updater, CommandHandler, MessageHandler, CallbackContext
+from telegram.ext.filters import TextFilter  # Corrected Filters import
 
 
 # Load environment variables
