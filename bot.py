@@ -3,8 +3,10 @@ import time
 import random
 from datetime import datetime, timedelta
 from pymongo import MongoClient
-from telegram import Update, ParseMode
+from telegram import Update
+from telegram.constants import ParseMode  # Corrected import
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
+
 
 # Load environment variables
 BOT_TOKEN = os.getenv("BOT_TOKEN")
