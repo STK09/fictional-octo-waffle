@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from pymongo import MongoClient
 from telegram import Update
 from telegram.constants import ParseMode
-from telegram.ext import Updater, CommandHandler, MessageHandler, CallbackContext, filters
+from telegram.ext import Application, CommandHandler, MessageHandler, filters
 
 # Load environment variables
 BOT_TOKEN = os.getenv("BOT_TOKEN")
@@ -180,24 +180,24 @@ def req(update: Update, context: CallbackContext):
     update.message.reply_text("✅ <b>Your request has been successfully submitted!</b>", parse_mode=ParseMode.HTML)
 
 # Main function
+# Main function
 def main():
-    updater = Updater(BOT_TOKEN)
-    dispatcher = updater.dispatcher
+    application = Application.builder().token(BOT_TOKEN).build()
 
     # Command handlers
-    dispatcher.add_handler(CommandHandler("login", login))
-    dispatcher.add_handler(CommandHandler("auth", auth))
-    dispatcher.add_handler(CommandHandler("unauth", unauth))
-    dispatcher.add_handler(CommandHandler("stats", stats))
-    dispatcher.add_handler(CommandHandler("users", users))
-    dispatcher.add_handler(CommandHandler("msg", msg))
-    dispatcher.add_handler(CommandHandler("req", req))
+    application.add_handler(CommandHandler("login", login))
+    application.add_handler(CommandHandler("auth", auth))
+    application.add_handler(CommandHandler("unauth", unauth))
+    application.add_handler(CommandHandler("stats", stats))
+    application.add_handler(CommandHandler("users", users))
+    application.add_handler(CommandHandler("msg", msg))
+    application.add_handler(CommandHandler("req", req))
 
     # Message handler for unauthorized users
-    dispatcher.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, unauthorized_message))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, unauthorized_message))
 
-    updater.start_polling()
-    updater.idle()
+    # Start polling the bot
+    application.run_polling()
 
 if __name__ == "__main__":
     main()
