@@ -1,5 +1,4 @@
 import os
-import time
 import random
 from datetime import datetime, timedelta
 from pymongo import MongoClient
@@ -37,7 +36,7 @@ def is_authorized(user_id):
     return users_collection.find_one({"user_id": user_id, "authorized": True}) is not None
 
 # Unauthorized message
-def unauthorized_message(update: Update, context: CallbackContext):
+def unauthorized_message(update: Update, context):
     update.message.reply_text(
         "🚫 <b>Unauthorized User</b>\n\n"
         "Use <code>/login (your_password)</code> to access this bot.",
@@ -45,7 +44,7 @@ def unauthorized_message(update: Update, context: CallbackContext):
     )
 
 # /login command
-def login(update: Update, context: CallbackContext):
+def login(update: Update, context):
     user_id = update.effective_user.id
     if is_authorized(user_id):
         update.message.reply_text("✅ <b>You are already logged in!</b>", parse_mode=ParseMode.HTML)
@@ -71,7 +70,7 @@ def login(update: Update, context: CallbackContext):
         update.message.reply_text("❌ <b>Invalid Password!</b>", parse_mode=ParseMode.HTML)
 
 # /auth command (Owner only)
-def auth(update: Update, context: CallbackContext):
+def auth(update: Update, context):
     if update.effective_user.id != OWNER_ID:
         return
 
@@ -96,7 +95,7 @@ def auth(update: Update, context: CallbackContext):
         update.message.reply_text("❌ <b>Invalid user_id or time format!</b>", parse_mode=ParseMode.HTML)
 
 # /unauth command (Owner only)
-def unauth(update: Update, context: CallbackContext):
+def unauth(update: Update, context):
     if update.effective_user.id != OWNER_ID:
         return
 
@@ -109,7 +108,7 @@ def unauth(update: Update, context: CallbackContext):
     update.message.reply_text(f"✅ <b>User {user_id} unauthorized!</b>", parse_mode=ParseMode.HTML)
 
 # /stats command (Owner only)
-def stats(update: Update, context: CallbackContext):
+def stats(update: Update, context):
     if update.effective_user.id != OWNER_ID:
         return
 
@@ -124,7 +123,7 @@ def stats(update: Update, context: CallbackContext):
     )
 
 # /users command (Owner only)
-def users(update: Update, context: CallbackContext):
+def users(update: Update, context):
     if update.effective_user.id != OWNER_ID:
         return
 
@@ -142,7 +141,7 @@ def users(update: Update, context: CallbackContext):
     )
 
 # /msg command (Owner only)
-def msg(update: Update, context: CallbackContext):
+def msg(update: Update, context):
     if update.effective_user.id != OWNER_ID:
         return
 
@@ -163,7 +162,7 @@ def msg(update: Update, context: CallbackContext):
         update.message.reply_text("❌ <b>Invalid Usage!</b> Reply to a message and use: <code>/msg (user_id)</code>", parse_mode=ParseMode.HTML)
 
 # /req command for authorized users
-def req(update: Update, context: CallbackContext):
+def req(update: Update, context):
     if not is_authorized(update.effective_user.id):
         unauthorized_message(update, context)
         return
@@ -179,7 +178,6 @@ def req(update: Update, context: CallbackContext):
     context.bot.send_message(chat_id=OWNER_ID, text=owner_message, parse_mode=ParseMode.HTML)
     update.message.reply_text("✅ <b>Your request has been successfully submitted!</b>", parse_mode=ParseMode.HTML)
 
-# Main function
 # Main function
 def main():
     application = Application.builder().token(BOT_TOKEN).build()
