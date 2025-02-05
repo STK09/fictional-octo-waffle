@@ -1,3 +1,2 @@
-python-telegram-bot
-pymongo
-Filters
+python-telegram-bot==20.3
+pymongo==4.5.0
