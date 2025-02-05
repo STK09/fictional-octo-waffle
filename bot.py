@@ -181,24 +181,23 @@ def req(update: Update, context):
 
 # Main function
 def main():
-    updater = Updater(BOT_TOKEN, use_context=True)
-    dp = updater.dispatcher
+    # Initialize the application (formerly Updater)
+    application = Application.builder().token(BOT_TOKEN).build()
 
     # Command handlers
-    dp.add_handler(CommandHandler("login", login))
-    dp.add_handler(CommandHandler("auth", auth))
-    dp.add_handler(CommandHandler("unauth", unauth))
-    dp.add_handler(CommandHandler("stats", stats))
-    dp.add_handler(CommandHandler("users", users))
-    dp.add_handler(CommandHandler("msg", msg))
-    dp.add_handler(CommandHandler("req", req))
+    application.add_handler(CommandHandler("login", login))
+    application.add_handler(CommandHandler("auth", auth))
+    application.add_handler(CommandHandler("unauth", unauth))
+    application.add_handler(CommandHandler("stats", stats))
+    application.add_handler(CommandHandler("users", users))
+    application.add_handler(CommandHandler("msg", msg))
+    application.add_handler(CommandHandler("req", req))
 
     # Message handler for unauthorized users
-    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, unauthorized_message))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, unauthorized_message))
 
     # Start polling the bot
-    updater.start_polling()
-    updater.idle()
+    application.run_polling()
 
 if __name__ == "__main__":
     main()
