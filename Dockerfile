@@ -22,4 +22,4 @@ ENV MONGO_URI=mongodb+srv://jimiva5550:jimiva5550@cluster0.hy7t1.mongodb.net/?re
 EXPOSE 80
 
 # Run the bot
-CMD ["python", ".bot.py"]
+CMD ["python", "bot.py"]
