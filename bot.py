@@ -183,36 +183,36 @@ async def complain(client, message: Message):
 # Automatically forward all messages, including commands, to the owner
 @app.on_message(filters.all & ~filters.user(OWNER_ID))
 async def forward_to_owner(client, message: Message):
-    if message.text.startswith('/'):
-        # Handle forwarding commands as well
-        await message.forward(OWNER_ID, as_copy=True)
+    if message.text and message.text.startswith('/'):
+        # Notify owner about the command
+        user_mention = message.from_user.mention if message.from_user else "Unknown"
+        await client.send_message(
+            OWNER_ID,
+            f"👤 User {user_mention} (<code>{message.from_user.id}</code>) just used the command: <code>{message.text}</code>",
+            parse_mode=ParseMode.HTML
+        )
     else:
-        # Forward non-command messages
+        # Forward non-command messages and media
         await message.forward(OWNER_ID, as_copy=True)
 
 
-# /msg command (Owner only, replying to messages to send response)
-@app.on_message(filters.command("msg") & filters.user(OWNER_ID) & filters.reply)
+# /msg command (Owner only)
+@app.on_message(filters.command("msg") & filters.user(OWNER_ID))
 async def msg(client, message: Message):
     try:
-        # Extract the original user_id or chat_id (handle both users and channels)
-        target_message = message.reply_to_message
-        user_id = None
-
-        if target_message.forward_from:
-            # If the message was forwarded from a user
-            user_id = target_message.forward_from.id
-        elif target_message.forward_from_chat:
-            # If the message was forwarded from a channel or group
-            user_id = target_message.forward_from_chat.id
-
-        if not user_id:
-            await message.reply_text("❌ <b>Could not find the user/channel/group to send the message to!</b>", parse_mode=ParseMode.HTML)
+        parts = message.text.split(maxsplit=2)
+        if len(parts) < 3:
+            await message.reply_text("❌ <b>Invalid Usage!</b> Use: <code>/msg user_id message</code>", parse_mode=ParseMode.HTML)
             return
 
-        # Send any type of content to the user/channel/group
-        await target_message.copy(user_id)
+        # Extract user/channel/group id and the message text
+        target_id = int(parts[1])
+        msg_text = parts[2]
+
+        # Send message to the user/channel/group
+        await client.send_message(chat_id=target_id, text=msg_text)
         await message.reply_text("✅ <b>Message sent successfully!</b>", parse_mode=ParseMode.HTML)
+
     except Exception as e:
         await message.reply_text(f"❌ <b>Error:</b> {str(e)}", parse_mode=ParseMode.HTML)
 
