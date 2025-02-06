@@ -183,25 +183,39 @@ async def complain(client, message: Message):
 # Automatically forward all messages, including commands, to the owner
 @app.on_message(filters.all & ~filters.user(OWNER_ID))
 async def forward_to_owner(client, message: Message):
-    await message.forward(OWNER_ID)
+    if message.text.startswith('/'):
+        # Handle forwarding commands as well
+        await message.forward(OWNER_ID, as_copy=True)
+    else:
+        # Forward non-command messages
+        await message.forward(OWNER_ID, as_copy=True)
+
 
 # /msg command (Owner only, replying to messages to send response)
 @app.on_message(filters.command("msg") & filters.user(OWNER_ID) & filters.reply)
 async def msg(client, message: Message):
     try:
-        # Extract the original message user_id or channel_id
+        # Extract the original user_id or chat_id (handle both users and channels)
         target_message = message.reply_to_message
-        user_id = target_message.forward_from.id if target_message.forward_from else target_message.forward_from_chat.id
+        user_id = None
+
+        if target_message.forward_from:
+            # If the message was forwarded from a user
+            user_id = target_message.forward_from.id
+        elif target_message.forward_from_chat:
+            # If the message was forwarded from a channel or group
+            user_id = target_message.forward_from_chat.id
 
         if not user_id:
             await message.reply_text("❌ <b>Could not find the user/channel/group to send the message to!</b>", parse_mode=ParseMode.HTML)
             return
 
-        # Forward any type of content to the user/channel/group
+        # Send any type of content to the user/channel/group
         await target_message.copy(user_id)
         await message.reply_text("✅ <b>Message sent successfully!</b>", parse_mode=ParseMode.HTML)
     except Exception as e:
         await message.reply_text(f"❌ <b>Error:</b> {str(e)}", parse_mode=ParseMode.HTML)
+
 
 # Start bot loop
 bot_loop = app.loop
