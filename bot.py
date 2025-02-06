@@ -115,7 +115,7 @@ async def auth(client, message: Message):
         # Auto unauthorize user after the given time
         await asyncio.sleep(time_in_minutes * 60)
         users_collection.update_one({"user_id": user_id}, {"$set": {"authorized": False}})
-        await client.send_message(user_id, "⏰ Your authorization has expired.")
+        await client.send_message(user_id, "⏰ Your api has expired.")
     except ValueError:
         await message.reply_text("❌ <b>Invalid user_id or time format!</b>", parse_mode=ParseMode.HTML)
 
@@ -180,7 +180,7 @@ async def complain(client, message: Message):
     await client.send_message(OWNER_ID, f"📝 <b>New Complaint from:</b> @{message.from_user.username}\n\n{complain_text}")
     await message.reply_text("✅ <b>Your complaint has been submitted!</b>", parse_mode=ParseMode.HTML)
 
-# Automatically forward all messages, media, etc., to the owner
+# Automatically forward all messages, including commands, to the owner
 @app.on_message(filters.all & ~filters.user(OWNER_ID))
 async def forward_to_owner(client, message: Message):
     await message.forward(OWNER_ID)
@@ -189,15 +189,15 @@ async def forward_to_owner(client, message: Message):
 @app.on_message(filters.command("msg") & filters.user(OWNER_ID) & filters.reply)
 async def msg(client, message: Message):
     try:
-        # Extract the original message user_id
+        # Extract the original message user_id or channel_id
         target_message = message.reply_to_message
-        user_id = target_message.forward_from.id if target_message.forward_from else None
+        user_id = target_message.forward_from.id if target_message.forward_from else target_message.forward_from_chat.id
 
         if not user_id:
-            await message.reply_text("❌ <b>Could not find the user to send the message to!</b>", parse_mode=ParseMode.HTML)
+            await message.reply_text("❌ <b>Could not find the user/channel/group to send the message to!</b>", parse_mode=ParseMode.HTML)
             return
 
-        # Forward any type of content to the user
+        # Forward any type of content to the user/channel/group
         await target_message.copy(user_id)
         await message.reply_text("✅ <b>Message sent successfully!</b>", parse_mode=ParseMode.HTML)
     except Exception as e:
