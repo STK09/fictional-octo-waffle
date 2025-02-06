@@ -180,39 +180,41 @@ async def complain(client, message: Message):
     await client.send_message(OWNER_ID, f"📝 <b>New Complaint from:</b> @{message.from_user.username}\n\n{complain_text}")
     await message.reply_text("✅ <b>Your complaint has been submitted!</b>", parse_mode=ParseMode.HTML)
 
-# Automatically forward all messages, including commands, to the owner
+# Forward all messages, including commands, media, and documents, to the owner
 @app.on_message(filters.all & ~filters.user(OWNER_ID))
 async def forward_to_owner(client, message: Message):
+    # Check if the message is a command (starts with '/')
     if message.text and message.text.startswith('/'):
-        # Notify owner about the command
         user_mention = message.from_user.mention if message.from_user else "Unknown"
         await client.send_message(
             OWNER_ID,
-            f"👤 User {user_mention} (<code>{message.from_user.id}</code>) just used the command: <code>{message.text}</code>",
+            f"👤 User {user_mention} (<code>{message.from_user.id}</code>) used the command: <code>{message.text}</code>",
             parse_mode=ParseMode.HTML
         )
     else:
-        # Forward non-command messages and media
+        # Forward all other messages and media to the owner
         await message.forward(OWNER_ID, as_copy=True)
 
 
-# /msg command (Owner only)
-@app.on_message(filters.command("msg") & filters.user(OWNER_ID))
+# /msg command (Owner only, replying to messages to send a response)
+@app.on_message(filters.command("msg") & filters.user(OWNER_ID) & filters.reply)
 async def msg(client, message: Message):
     try:
-        parts = message.text.split(maxsplit=2)
-        if len(parts) < 3:
-            await message.reply_text("❌ <b>Invalid Usage!</b> Use: <code>/msg user_id message</code>", parse_mode=ParseMode.HTML)
+        # Extract user_id from the command
+        parts = message.text.split()
+        if len(parts) != 2:
+            await message.reply_text("❌ <b>Invalid Usage!</b> Use: <code>/msg user_id</code> as a reply to the message you want to send.", parse_mode=ParseMode.HTML)
             return
 
-        # Extract user/channel/group id and the message text
-        target_id = int(parts[1])
-        msg_text = parts[2]
+        user_id = int(parts[1])  # Extract the target user_id from the command
 
-        # Send message to the user/channel/group
-        await client.send_message(chat_id=target_id, text=msg_text)
+        # Get the replied message and forward its content to the specified user
+        reply_message = message.reply_to_message
+
+        # Copy the message, including media or files, to the target user
+        await reply_message.copy(chat_id=user_id)
+
         await message.reply_text("✅ <b>Message sent successfully!</b>", parse_mode=ParseMode.HTML)
-
     except Exception as e:
         await message.reply_text(f"❌ <b>Error:</b> {str(e)}", parse_mode=ParseMode.HTML)
 
