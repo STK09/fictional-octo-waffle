@@ -3,14 +3,21 @@ import time
 import random
 from datetime import datetime, timedelta
 from pymongo import MongoClient
-from telegram import Update
-from telegram.constants import ParseMode  # Updated import
-from telegram.ext import Application, CommandHandler, MessageHandler, filters
+from pyrogram import Client, filters
+from pyrogram.types import Message
+from uvloop import install
 
 # Load environment variables
 BOT_TOKEN = os.getenv("BOT_TOKEN")
+API_ID = int(os.getenv("API_ID"))
+API_HASH = os.getenv("API_HASH")
 OWNER_ID = int(os.getenv("OWNER_ID"))
 MONGO_URI = os.getenv("MONGO_URI")
+
+# Initialize Pyrogram Client
+bot = Client("telegram_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN).start()
+
+install()
 
 # Database connection
 client = MongoClient(MONGO_URI)
@@ -26,108 +33,99 @@ temporary_passwords = {}
 def format_time(minutes):
     days, rem = divmod(minutes, 1440)
     hours, minutes = divmod(rem, 60)
-    time_str = []
-    if days: time_str.append(f"{days} day{'s' if days > 1 else ''}")
-    if hours: time_str.append(f"{hours} hour{'s' if hours > 1 else ''}")
-    if minutes: time_str.append(f"{minutes} minute{'s' if minutes > 1 else ''}")
-    return " ".join(time_str)
+    return f"{days}d {hours}h {minutes}m".strip()
 
 # Helper function: Check if user is authorized
 def is_authorized(user_id):
     return users_collection.find_one({"user_id": user_id, "authorized": True}) is not None
 
 # Unauthorized message
-def unauthorized_message(update: Update, context):
-    update.message.reply_text(
+async def unauthorized_message(client, message):
+    await message.reply_text(
         "🚫 <b>Unauthorized User</b>\n\n"
-        "Use <code>/login (your_password)</code> to access this bot.",
-        parse_mode=ParseMode.HTML,
+        "Use <code>/login your_password</code> to access this bot.",
+        parse_mode="html",
     )
 
 # /login command
-def login(update: Update, context):
-    user_id = update.effective_user.id
+@app.on_message(filters.command("login"))
+async def login(client, message: Message):
+    user_id = message.from_user.id
     if is_authorized(user_id):
-        update.message.reply_text("✅ <b>You are already logged in!</b>", parse_mode=ParseMode.HTML)
+        await message.reply_text("✅ <b>You are already logged in!</b>", parse_mode="html")
         return
 
-    if len(context.args) != 1:
-        update.message.reply_text("❌ <b>Invalid Usage!</b> Use: <code>/login (your_password)</code>", parse_mode=ParseMode.HTML)
+    parts = message.text.split()
+    if len(parts) != 2:
+        await message.reply_text("❌ <b>Invalid Usage!</b> Use: <code>/login your_password</code>", parse_mode="html")
         return
 
-    password = context.args[0]
+    password = parts[1]
     temp_password = temporary_passwords.get(user_id)
 
     if temp_password and password == temp_password["password"]:
-        # Grant access and remove temporary password
         users_collection.update_one(
             {"user_id": user_id},
-            {"$set": {"authorized": True, "expires_at": None, "username": update.effective_user.username}},
+            {"$set": {"authorized": True, "expires_at": None, "username": message.from_user.username}},
             upsert=True,
         )
         del temporary_passwords[user_id]
-        update.message.reply_text("✅ <b>Login Successful!</b>", parse_mode=ParseMode.HTML)
+        await message.reply_text("✅ <b>Login Successful!</b>", parse_mode="html")
     else:
-        update.message.reply_text("❌ <b>Invalid Password!</b>", parse_mode=ParseMode.HTML)
+        await message.reply_text("❌ <b>Invalid Password!</b>", parse_mode="html")
 
 # /auth command (Owner only)
-def auth(update: Update, context):
-    if update.effective_user.id != OWNER_ID:
-        return
-
-    if len(context.args) != 2:
-        update.message.reply_text("❌ <b>Invalid Usage!</b> Use: <code>/auth (user_id) (time_in_minutes)</code>", parse_mode=ParseMode.HTML)
+@app.on_message(filters.command("auth") & filters.user(OWNER_ID))
+async def auth(client, message: Message):
+    parts = message.text.split()
+    if len(parts) != 3:
+        await message.reply_text("❌ <b>Invalid Usage!</b> Use: <code>/auth user_id time_in_minutes</code>", parse_mode="html")
         return
 
     try:
-        user_id = int(context.args[0])
-        time_in_minutes = int(context.args[1])
+        user_id = int(parts[1])
+        time_in_minutes = int(parts[2])
         password = str(random.randint(10000000, 99999999))
         expiry_time = datetime.now() + timedelta(minutes=time_in_minutes)
 
         temporary_passwords[user_id] = {"password": password, "expires_at": expiry_time}
 
-        update.message.reply_text(
+        await message.reply_text(
             f"✅ <b>Temporary Password:</b> <code>{password}</code>\n"
             f"Expires in: <b>{format_time(time_in_minutes)}</b>",
-            parse_mode=ParseMode.HTML,
+            parse_mode="html",
         )
     except ValueError:
-        update.message.reply_text("❌ <b>Invalid user_id or time format!</b>", parse_mode=ParseMode.HTML)
+        await message.reply_text("❌ <b>Invalid user_id or time format!</b>", parse_mode="html")
 
 # /unauth command (Owner only)
-def unauth(update: Update, context):
-    if update.effective_user.id != OWNER_ID:
+@app.on_message(filters.command("unauth") & filters.user(OWNER_ID))
+async def unauth(client, message: Message):
+    parts = message.text.split()
+    if len(parts) != 2:
+        await message.reply_text("❌ <b>Invalid Usage!</b> Use: <code>/unauth user_id</code>", parse_mode="html")
         return
 
-    if len(context.args) != 1:
-        update.message.reply_text("❌ <b>Invalid Usage!</b> Use: <code>/unauth (user_id)</code>", parse_mode=ParseMode.HTML)
-        return
-
-    user_id = int(context.args[0])
+    user_id = int(parts[1])
     users_collection.update_one({"user_id": user_id}, {"$set": {"authorized": False}})
-    update.message.reply_text(f"✅ <b>User {user_id} unauthorized!</b>", parse_mode=ParseMode.HTML)
+    await message.reply_text(f"✅ <b>User {user_id} unauthorized!</b>", parse_mode="html")
 
 # /stats command (Owner only)
-def stats(update: Update, context):
-    if update.effective_user.id != OWNER_ID:
-        return
-
+@app.on_message(filters.command("stats") & filters.user(OWNER_ID))
+async def stats(client, message: Message):
     authorized_count = users_collection.count_documents({"authorized": True})
     uptime = datetime.now() - BOT_START_TIME
 
-    update.message.reply_text(
+    await message.reply_text(
         f"📊 <b>Bot Stats</b>\n\n"
         f"👥 Authorized Users: <b>{authorized_count}</b>\n"
         f"⏱ Uptime: <b>{str(uptime).split('.')[0]}</b>",
-        parse_mode=ParseMode.HTML,
+        parse_mode="html",
     )
 
 # /users command (Owner only)
-def users(update: Update, context):
-    if update.effective_user.id != OWNER_ID:
-        return
-
+@app.on_message(filters.command("users") & filters.user(OWNER_ID))
+async def users(client, message: Message):
     users = users_collection.find({"authorized": True})
     user_list = "\n".join(
         [f"👤 @{user.get('username', 'Unknown')} (<code>{user['user_id']}</code>)" for user in users]
@@ -136,68 +134,43 @@ def users(update: Update, context):
     if not user_list:
         user_list = "No authorized users."
 
-    update.message.reply_text(
+    await message.reply_text(
         f"👥 <b>Authorized Users:</b>\n\n{user_list}",
-        parse_mode=ParseMode.HTML,
+        parse_mode="html",
     )
 
 # /msg command (Owner only)
-def msg(update: Update, context):
-    if update.effective_user.id != OWNER_ID:
+@app.on_message(filters.command("msg") & filters.user(OWNER_ID))
+async def msg(client, message: Message):
+    parts = message.text.split()
+    if len(parts) < 3:
+        await message.reply_text("❌ <b>Invalid Usage!</b> Use: <code>/msg user_id message</code>", parse_mode="html")
         return
 
-    if update.reply_to_message and len(context.args) == 1:
-        target_id = int(context.args[0])
-        message = update.reply_to_message
+    target_id = int(parts[1])
+    msg_text = " ".join(parts[2:])
 
-        try:
-            context.bot.copy_message(
-                chat_id=target_id,
-                from_chat_id=update.effective_chat.id,
-                message_id=message.message_id,
-            )
-            update.message.reply_text("✅ <b>Message sent successfully!</b>", parse_mode=ParseMode.HTML)
-        except Exception as e:
-            update.message.reply_text(f"❌ <b>Error:</b> {str(e)}", parse_mode=ParseMode.HTML)
-    else:
-        update.message.reply_text("❌ <b>Invalid Usage!</b> Reply to a message and use: <code>/msg (user_id)</code>", parse_mode=ParseMode.HTML)
+    try:
+        await client.send_message(target_id, msg_text)
+        await message.reply_text("✅ <b>Message sent successfully!</b>", parse_mode="html")
+    except Exception as e:
+        await message.reply_text(f"❌ <b>Error:</b> {str(e)}", parse_mode="html")
 
-# /req command for authorized users
-def req(update: Update, context):
-    if not is_authorized(update.effective_user.id):
-        unauthorized_message(update, context)
+# /req command (for authorized users)
+@app.on_message(filters.command("req"))
+async def req(client, message: Message):
+    user_id = message.from_user.id
+    if not is_authorized(user_id):
+        await unauthorized_message(client, message)
         return
 
-    if len(context.args) == 0:
-        update.message.reply_text("❌ <b>Invalid Usage!</b> Use: <code>/req (request_text)</code>", parse_mode=ParseMode.HTML)
+    request_text = message.text.split(maxsplit=1)[1] if len(message.text.split()) > 1 else None
+    if not request_text:
+        await message.reply_text("❌ <b>Invalid Usage!</b> Use: <code>/req your_request</code>", parse_mode="html")
         return
 
-    request_text = " ".join(context.args)
-    owner_message = f"📥 <b>New Request</b>\n\n👤 From: @{update.effective_user.username} (<code>{update.effective_user.id}</code>)\n📝 Request: {request_text}"
-    requests_collection.insert_one({"user_id": update.effective_user.id, "request": request_text, "timestamp": datetime.now()})
+    requests_collection.insert_one({"user_id": user_id, "request": request_text, "timestamp": datetime.now()})
+    await message.reply_text("✅ <b>Your request has been submitted!</b>", parse_mode="html")
 
-    context.bot.send_message(chat_id=OWNER_ID, text=owner_message, parse_mode=ParseMode.HTML)
-    update.message.reply_text("✅ <b>Your request has been successfully submitted!</b>", parse_mode=ParseMode.HTML)
-
-# Main function
-def main():
-    # Initialize the application (formerly Updater)
-    application = Application.builder().token(BOT_TOKEN).build()
-
-    # Command handlers
-    application.add_handler(CommandHandler("login", login))
-    application.add_handler(CommandHandler("auth", auth))
-    application.add_handler(CommandHandler("unauth", unauth))
-    application.add_handler(CommandHandler("stats", stats))
-    application.add_handler(CommandHandler("users", users))
-    application.add_handler(CommandHandler("msg", msg))
-    application.add_handler(CommandHandler("req", req))
-
-    # Message handler for unauthorized users
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, unauthorized_message))
-
-    # Start polling the bot
-    application.run_polling()
-
-if __name__ == "__main__":
-    main()
+bot_loop = bot.loop
+bot.loop.run_forever()
