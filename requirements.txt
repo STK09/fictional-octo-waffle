@@ -2,3 +2,4 @@ python-telegram-bot
 pymongo
 pyrogram
 uvloop
+TgCrypto
