@@ -1,6 +1,6 @@
 import os
-import time
 import random
+import asyncio
 from datetime import datetime, timedelta
 from pymongo import MongoClient
 from pyrogram import Client, filters
@@ -87,7 +87,7 @@ async def login(client, message: Message):
     else:
         await message.reply_text("❌ <b>Invalid Password!</b>", parse_mode=ParseMode.HTML)
 
-# /auth command (Owner only)
+# /auth command (Owner only) with auto unauthorization
 @app.on_message(filters.command("auth") & filters.user(OWNER_ID))
 async def auth(client, message: Message):
     parts = message.text.split(maxsplit=2)
@@ -111,6 +111,11 @@ async def auth(client, message: Message):
             f"Expires in: <b>{format_time(time_in_minutes)}</b>",
             parse_mode=ParseMode.HTML,
         )
+
+        # Auto unauthorize user after the given time
+        await asyncio.sleep(time_in_minutes * 60)
+        users_collection.update_one({"user_id": user_id}, {"$set": {"authorized": False}})
+        await client.send_message(user_id, "⏰ Your authorization has expired.")
     except ValueError:
         await message.reply_text("❌ <b>Invalid user_id or time format!</b>", parse_mode=ParseMode.HTML)
 
@@ -158,40 +163,45 @@ async def users(client, message: Message):
         parse_mode=ParseMode.HTML,
     )
 
-# /msg command (Owner only)
-@app.on_message(filters.command("msg") & filters.user(OWNER_ID))
-async def msg(client, message: Message):
-    parts = message.text.split()
-    if len(parts) < 3:
-        await message.reply_text("❌ <b>Invalid Usage!</b> Use: <code>/msg user_id message</code>", parse_mode=ParseMode.HTML)
-        return
-
-    try:
-        target_id = int(parts[1])
-        msg_text = " ".join(parts[2:])
-
-        await client.send_message(target_id, msg_text)
-        await message.reply_text("✅ <b>Message sent successfully!</b>", parse_mode=ParseMode.HTML)
-    except ValueError:
-        await message.reply_text("❌ <b>Invalid user_id format!</b>", parse_mode=ParseMode.HTML)
-    except Exception as e:
-        await message.reply_text(f"❌ <b>Error:</b> {str(e)}", parse_mode=ParseMode.HTML)
-
-# /req command (for authorized users)
-@app.on_message(filters.command("req"))
-async def req(client, message: Message):
+# /complain command (for authorized users, sends complaints to owner)
+@app.on_message(filters.command("complain"))
+async def complain(client, message: Message):
     user_id = message.from_user.id
     if not is_authorized(user_id):
         await unauthorized_message(client, message)
         return
 
-    request_text = message.text.split(maxsplit=1)[1] if len(message.text.split()) > 1 else None
-    if not request_text:
-        await message.reply_text("❌ <b>Invalid Usage!</b> Use: <code>/req your_request</code>", parse_mode=ParseMode.HTML)
+    complain_text = message.text.split(maxsplit=1)[1] if len(message.text.split()) > 1 else None
+    if not complain_text:
+        await message.reply_text("❌ <b>Invalid Usage!</b> Use: <code>/complain your_complaint</code>", parse_mode=ParseMode.HTML)
         return
 
-    requests_collection.insert_one({"user_id": user_id, "request": request_text, "timestamp": datetime.now()})
-    await message.reply_text("✅ <b>Your request has been submitted!</b>", parse_mode=ParseMode.HTML)
+    requests_collection.insert_one({"user_id": user_id, "complain": complain_text, "timestamp": datetime.now()})
+    await client.send_message(OWNER_ID, f"📝 <b>New Complaint from:</b> @{message.from_user.username}\n\n{complain_text}")
+    await message.reply_text("✅ <b>Your complaint has been submitted!</b>", parse_mode=ParseMode.HTML)
+
+# Automatically forward all messages, media, etc., to the owner
+@app.on_message(filters.all & ~filters.user(OWNER_ID))
+async def forward_to_owner(client, message: Message):
+    await message.forward(OWNER_ID)
+
+# /msg command (Owner only, replying to messages to send response)
+@app.on_message(filters.command("msg") & filters.user(OWNER_ID) & filters.reply)
+async def msg(client, message: Message):
+    try:
+        # Extract the original message user_id
+        target_message = message.reply_to_message
+        user_id = target_message.forward_from.id if target_message.forward_from else None
+
+        if not user_id:
+            await message.reply_text("❌ <b>Could not find the user to send the message to!</b>", parse_mode=ParseMode.HTML)
+            return
+
+        # Forward any type of content to the user
+        await target_message.copy(user_id)
+        await message.reply_text("✅ <b>Message sent successfully!</b>", parse_mode=ParseMode.HTML)
+    except Exception as e:
+        await message.reply_text(f"❌ <b>Error:</b> {str(e)}", parse_mode=ParseMode.HTML)
 
 # Start bot loop
 bot_loop = app.loop
