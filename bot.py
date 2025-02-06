@@ -15,7 +15,7 @@ OWNER_ID = int(os.getenv("OWNER_ID"))
 MONGO_URI = os.getenv("MONGO_URI")
 
 # Initialize Pyrogram Client
-bot = Client("telegram_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN).start()
+app = Client("telegram_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN).start()
 
 install()
 
@@ -172,5 +172,5 @@ async def req(client, message: Message):
     requests_collection.insert_one({"user_id": user_id, "request": request_text, "timestamp": datetime.now()})
     await message.reply_text("✅ <b>Your request has been submitted!</b>", parse_mode="html")
 
-bot_loop = bot.loop
-bot.loop.run_forever()
+bot_loop = app.loop
+app.loop.run_forever()
