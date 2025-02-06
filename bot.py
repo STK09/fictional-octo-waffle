@@ -38,6 +38,9 @@ def format_time(minutes):
 
 # Helper function: Check if user is authorized
 def is_authorized(user_id):
+    # Owner is always authorized
+    if user_id == OWNER_ID:
+        return True
     return users_collection.find_one({"user_id": user_id, "authorized": True}) is not None
 
 # Unauthorized message
@@ -87,7 +90,7 @@ async def login(client, message: Message):
 # /auth command (Owner only)
 @app.on_message(filters.command("auth") & filters.user(OWNER_ID))
 async def auth(client, message: Message):
-    parts = message.text.split()
+    parts = message.text.split(maxsplit=2)
     if len(parts) != 3:
         await message.reply_text("❌ <b>Invalid Usage!</b> Use: <code>/auth user_id time_in_minutes</code>", parse_mode=ParseMode.HTML)
         return
@@ -95,15 +98,18 @@ async def auth(client, message: Message):
     try:
         user_id = int(parts[1])
         time_in_minutes = int(parts[2])
+
+        # Generate a random 8-digit password
         password = str(random.randint(10000000, 99999999))
         expiry_time = datetime.now() + timedelta(minutes=time_in_minutes)
 
+        # Store the temporary password and its expiry time
         temporary_passwords[user_id] = {"password": password, "expires_at": expiry_time}
 
         await message.reply_text(
             f"✅ <b>Temporary Password:</b> <code>{password}</code>\n"
             f"Expires in: <b>{format_time(time_in_minutes)}</b>",
-            parse_mode="ParseMode.HTML",
+            parse_mode=ParseMode.HTML,
         )
     except ValueError:
         await message.reply_text("❌ <b>Invalid user_id or time format!</b>", parse_mode=ParseMode.HTML)
@@ -116,9 +122,12 @@ async def unauth(client, message: Message):
         await message.reply_text("❌ <b>Invalid Usage!</b> Use: <code>/unauth user_id</code>", parse_mode=ParseMode.HTML)
         return
 
-    user_id = int(parts[1])
-    users_collection.update_one({"user_id": user_id}, {"$set": {"authorized": False}})
-    await message.reply_text(f"✅ <b>User {user_id} unauthorized!</b>", parse_mode=ParseMode.HTML)
+    try:
+        user_id = int(parts[1])
+        users_collection.update_one({"user_id": user_id}, {"$set": {"authorized": False}})
+        await message.reply_text(f"✅ <b>User {user_id} unauthorized!</b>", parse_mode=ParseMode.HTML)
+    except ValueError:
+        await message.reply_text("❌ <b>Invalid user_id format!</b>", parse_mode=ParseMode.HTML)
 
 # /stats command (Owner only)
 @app.on_message(filters.command("stats") & filters.user(OWNER_ID))
@@ -157,12 +166,14 @@ async def msg(client, message: Message):
         await message.reply_text("❌ <b>Invalid Usage!</b> Use: <code>/msg user_id message</code>", parse_mode=ParseMode.HTML)
         return
 
-    target_id = int(parts[1])
-    msg_text = " ".join(parts[2:])
-
     try:
+        target_id = int(parts[1])
+        msg_text = " ".join(parts[2:])
+
         await client.send_message(target_id, msg_text)
         await message.reply_text("✅ <b>Message sent successfully!</b>", parse_mode=ParseMode.HTML)
+    except ValueError:
+        await message.reply_text("❌ <b>Invalid user_id format!</b>", parse_mode=ParseMode.HTML)
     except Exception as e:
         await message.reply_text(f"❌ <b>Error:</b> {str(e)}", parse_mode=ParseMode.HTML)
 
