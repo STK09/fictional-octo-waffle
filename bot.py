@@ -48,6 +48,15 @@ async def unauthorized_message(client, message):
         parse_mode=ParseMode.HTML,
     )
 
+# /start command: Greet the user
+@app.on_message(filters.command("start"))
+async def start(client, message: Message):
+    await message.reply_text(
+        "👋 Welcome to the bot!\n\n"
+        "Please use <code>/login your_password</code> to authenticate yourself or contact the bot owner.",
+        parse_mode=ParseMode.HTML,
+    )
+
 # /login command
 @app.on_message(filters.command("login"))
 async def login(client, message: Message):
@@ -173,5 +182,6 @@ async def req(client, message: Message):
     requests_collection.insert_one({"user_id": user_id, "request": request_text, "timestamp": datetime.now()})
     await message.reply_text("✅ <b>Your request has been submitted!</b>", parse_mode=ParseMode.HTML)
 
+# Start bot loop
 bot_loop = app.loop
 app.loop.run_forever()
