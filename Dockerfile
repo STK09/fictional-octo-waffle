@@ -17,9 +17,10 @@ COPY . .
 ENV BOT_TOKEN=7339125851:AAGSGhXjlDNtQPzYWlZpqp4WmuNMDTsiqIU
 ENV OWNER_ID=5827289728
 ENV MONGO_URI=mongodb+srv://jimiva5550:jimiva5550@cluster0.hy7t1.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0
-
+ENV API_ID=24124490
+ENV API_HASH=0ba2366316a2d1b00739c1d95c6557bb
 # Expose port (if you're using a web server, else you can skip this line)
 EXPOSE 80
 
 # Run the bot
-CMD ["python", "bot.py"]
+CMD ["python3", "bot.py"]
